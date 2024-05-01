@@ -1,11 +1,10 @@
 package handlers
 
 import (
-	"github.com/Alieksieiev0/space-invaders/internal/entities"
 	"github.com/veandco/go-sdl2/sdl"
 )
 
-func NewProjectileHandler(fire func(), move func()) entities.Handler {
+func NewProjectileHandler(fire func(), move func()) Handler {
 	return &ProjectileHandler{
 		fire: fire,
 		move: move,

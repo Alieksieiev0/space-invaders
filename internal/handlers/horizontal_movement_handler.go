@@ -1,11 +1,10 @@
 package handlers
 
 import (
-	"github.com/Alieksieiev0/space-invaders/internal/entities"
 	"github.com/veandco/go-sdl2/sdl"
 )
 
-func NewHorizontalMovementHandler(left func(), right func()) entities.AfterEventHandler {
+func NewHorizontalMovementHandler(left func(), right func()) *HorizontalMovementHandler {
 	return &HorizontalMovementHandler{
 		moveLeft:  left,
 		moveRight: right,

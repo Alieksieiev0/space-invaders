@@ -11,13 +11,14 @@ const (
 	frameDelay = 1000 / fps
 )
 
-func NewGameLoop(player entities.PlayerEntity, bg entities.StaticEntity) Loop {
-	return &GameLoop{player: player, bg: bg}
+func NewGameLoop(player Player, enemyPool EnemyPool, bg entities.StaticEntity) Loop {
+	return &GameLoop{player: player, enemyPool: enemyPool, bg: bg}
 }
 
 type GameLoop struct {
-	player entity.PlayerEntity
-	bg     entity.StaticEntity
+	player    Player
+	enemyPool EnemyPool
+	bg        entity.StaticEntity
 }
 
 func (g *GameLoop) Run(r *sdl.Renderer) error {
@@ -40,7 +41,13 @@ func (g *GameLoop) Run(r *sdl.Renderer) error {
 			}
 		}
 
+		g.enemyPool.HandleAfterEvent()
+		g.enemyPool.DrawEnemies(r)
+
 		g.player.HandleAfterEvent()
+		if !g.player.IsAlive() {
+			return nil
+		}
 		if err := g.player.Draw(r); err != nil {
 			return err
 		}
@@ -53,18 +60,5 @@ func (g *GameLoop) Run(r *sdl.Renderer) error {
 		if frameDelay > frameTime {
 			sdl.Delay(uint32(frameDelay - frameTime))
 		}
-
-		// if err := r.Clear(); err != nil {
-		// 	return err
-		// }
-		// g.player.Update()
-		// if err := g.player.Draw(r); err != nil {
-		// 	return err
-		// }
-		// if err := g.bg.Draw(r); err != nil {
-		// 	return err
-		// }
-		// r.Present()
-
 	}
 }

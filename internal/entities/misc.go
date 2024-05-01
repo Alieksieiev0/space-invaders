@@ -32,7 +32,7 @@ func NewBackgroundFactory() BackgroundFactory {
 type BackgroundFactory struct {
 }
 
-func (b BackgroundFactory) CreateWhite() StaticEntity {
+func (b BackgroundFactory) CreateWhite() *Background {
 	return &Background{
 		color: sdl.Color{R: 255, G: 255, B: 255, A: 0},
 	}
