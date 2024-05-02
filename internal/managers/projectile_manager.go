@@ -19,81 +19,90 @@ const (
 	height = 25
 )
 
-func NewProjectileManagerFactory() ProjectileManagerFactory {
-	return ProjectileManagerFactory{}
+func NewBidirectionalProjectileFactory() BidirectionalProjectileFactory {
+	return BidirectionalProjectileFactory{}
 }
 
-type ProjectileManagerFactory struct {
+type BidirectionalProjectileFactory struct {
 }
 
-func (p ProjectileManagerFactory) CreateInNegativeDirection(
+func (b BidirectionalProjectileFactory) create(
 	launcher entities.Entity[float32, *sdl.FRect],
-	targets []entities.Entity[float32, *sdl.FRect],
 	texture *sdl.Texture,
-) EntityManager {
-	return &ProjectileManager{
-		launcher:  launcher,
-		targets:   targets,
-		texture:   texture,
-		w:         width,
-		h:         height,
-		direction: negative,
+) *BidirectionalProjectile {
+	return &BidirectionalProjectile{
+		launcher: launcher,
+		texture:  texture,
+		w:        width,
+		h:        height,
 	}
 }
 
-func (p ProjectileManagerFactory) CreateInPositiveDirection(
+func (b BidirectionalProjectileFactory) CreateInNegativeDirection(
 	launcher entities.Entity[float32, *sdl.FRect],
-	targets []entities.Entity[float32, *sdl.FRect],
 	texture *sdl.Texture,
-) EntityManager {
-	return &ProjectileManager{
-		launcher:  launcher,
-		targets:   targets,
-		texture:   texture,
-		w:         width,
-		h:         height,
-		direction: positive,
+) ProjectileManager {
+	p := b.create(launcher, texture)
+	p.direction = negative
+
+	return p
+}
+
+func (b BidirectionalProjectileFactory) CreateInPositiveDirection(
+	launcher entities.Entity[float32, *sdl.FRect],
+	texture *sdl.Texture,
+) ProjectileManager {
+	p := b.create(launcher, texture)
+	p.direction = positive
+
+	return p
+}
+
+type BidirectionalProjectile struct {
+	launcher   entities.Entity[float32, *sdl.FRect]
+	texture    *sdl.Texture
+	w          float32
+	h          float32
+	projectile entities.MoveableEntity[float32, *sdl.FRect]
+	targets    []entities.Entity[float32, *sdl.FRect]
+	direction  direction
+}
+
+func (b *BidirectionalProjectile) AddTarget(entity entities.Entity[float32, *sdl.FRect]) {
+	b.targets = append(b.targets, entity)
+}
+
+func (b *BidirectionalProjectile) Spawn(r *sdl.Renderer) error {
+	if b.projectile != nil || !b.launcher.IsAlive() {
+		return nil
 	}
-}
-
-type ProjectileManager struct {
-	launcher    entities.Entity[float32, *sdl.FRect]
-	texture     *sdl.Texture
-	w           float32
-	h           float32
-	projectiles []entities.MoveableEntity[float32, *sdl.FRect]
-	targets     []entities.Entity[float32, *sdl.FRect]
-	direction   direction
-}
-
-func (p *ProjectileManager) Spawn(r *sdl.Renderer) error {
-	x, y := p.coordinates()
+	x, y := b.coordinates()
 	projectile := entities.NewFloatRectFactory().
-		Create(p.texture, entities.Missile, x, y, p.w, p.h)
-	if err := p.draw(r, projectile); err != nil {
+		Create(b.texture, entities.Missile, x, y, b.w, b.h)
+	if err := b.draw(r, projectile); err != nil {
 		return err
 	}
-	p.projectiles = append(p.projectiles, projectile)
+	b.projectile = projectile
 	return nil
 }
 
-func (p *ProjectileManager) coordinates() (float32, float32) {
-	x, y, w, h := p.launcher.Dimensions()
-	center := x + (w/2 - p.w/2)
-	switch p.direction {
+func (b *BidirectionalProjectile) coordinates() (float32, float32) {
+	x, y, w, _ := b.launcher.Dimensions()
+	center := x + (w/2 - b.w/2)
+	switch b.direction {
 	case positive:
-		return center, y + h + p.h
+		return center, y + b.h
 	case negative:
-		return center, y - p.h
+		return center, y - b.h
 	}
 	return 0, 0
 }
 
-func (p *ProjectileManager) draw(
+func (b *BidirectionalProjectile) draw(
 	r *sdl.Renderer,
 	pr entities.MoveableEntity[float32, *sdl.FRect],
 ) error {
-	switch p.direction {
+	switch b.direction {
 	case positive:
 		return pr.Rotate(r, 180)
 	case negative:
@@ -102,33 +111,39 @@ func (p *ProjectileManager) draw(
 	return nil
 }
 
-func (p *ProjectileManager) Behave(r *sdl.Renderer) error {
-	for i, pr := range p.projectiles {
-		switch p.direction {
-		case positive:
-			pr.Move(0, 1.00)
-		case negative:
-			pr.Move(0, -3.00)
-		}
-		if err := p.handleNewPosition(r, i, pr); err != nil {
-			return err
-		}
+func (b *BidirectionalProjectile) Behave(r *sdl.Renderer) error {
+	if b.projectile == nil {
+		return nil
+	}
+	switch b.direction {
+	case positive:
+		b.projectile.Move(0, 2.00)
+	case negative:
+		b.projectile.Move(0, -2.00)
+	}
+	if err := b.handleNewPosition(r); err != nil {
+		return err
 	}
 	return nil
 }
 
-func (p *ProjectileManager) handleNewPosition(
-	r *sdl.Renderer,
-	i int,
-	pr entities.MoveableEntity[float32, *sdl.FRect],
-) error {
-	for j, t := range p.targets {
-		if pr.Intersect(t) {
+func (b *BidirectionalProjectile) handleNewPosition(r *sdl.Renderer) error {
+	for j, t := range b.targets {
+		if t == nil || !t.IsAlive() {
+			b.targets = slices.Delete(b.targets, j, j+1)
+			break
+		}
+		if b.projectile.Intersect(t) {
 			t.Destroy()
-			p.projectiles = slices.Delete(p.projectiles, i, i+1)
-			p.targets = slices.Delete(p.targets, j, j+1)
+			b.projectile = nil
+			b.targets = slices.Delete(b.targets, j, j+1)
 			return nil
 		}
 	}
-	return pr.Draw(r)
+	rect := b.projectile.Rect()
+	if rect.Y <= 0 || rect.Y >= 600 || rect.X <= 0 || rect.X >= 800 {
+		b.projectile = nil
+		return nil
+	}
+	return b.draw(r, b.projectile)
 }

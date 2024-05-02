@@ -2,8 +2,6 @@ package game
 
 import (
 	"github.com/Alieksieiev0/space-invaders/internal/entities"
-	"github.com/Alieksieiev0/space-invaders/internal/handlers"
-	"github.com/Alieksieiev0/space-invaders/internal/managers"
 	"github.com/veandco/go-sdl2/img"
 	"github.com/veandco/go-sdl2/sdl"
 )
@@ -42,12 +40,9 @@ func (g *GameManager) Start() error {
 	if err != nil {
 		return err
 	}
-	bg := entities.NewBackgroundFactory().CreateWhite()
-	if err = bg.Draw(r); err != nil {
-		return err
-	}
 
-	if err = r.Clear(); err != nil {
+	background, err := Load(r, "assets/background.png")
+	if err != nil {
 		return err
 	}
 
@@ -66,59 +61,39 @@ func (g *GameManager) Start() error {
 		return err
 	}
 
-	frect := entities.NewFloatRectFactory().
-		Create(ship, entities.Player, 375, 475, 50, 50)
+	bg := entities.NewBackgroundFactory().Create(background)
 
-	enemyPool, err := NewGameEnemyPoolFactory().CreateDefault([]*sdl.Texture{ship, boss})
-	if err != nil {
+	enemyPool := NewGameEnemyPoolFactory().CreateDefault(boss, ship)
+	enemyPool.InitializeProjectileManager(missile)
+	player := setupPlayer(r, ship, missile, enemyPool)
+	enemyPool.AddTarget(player)
+
+	if err := bg.Draw(r); err != nil {
 		return err
 	}
-
-	var enemies []entities.Entity[float32, *sdl.FRect]
-	for _, e := range enemyPool.Enemies() {
-		enemies = append(enemies, e)
-	}
-
-	projectile := managers.NewProjectileManagerFactory().
-		CreateInNegativeDirection(frect, enemies, missile)
-
-	movementHandler := handlers.NewHorizontalMovementHandler(
-		func() {
-			frect.Move(-frect.StepX(), 0)
-		},
-		func() {
-			frect.Move(frect.StepX(), 0)
-		},
-	)
-	projectileHandler := handlers.NewProjectileHandler(
-		func() {
-			projectile.Spawn(r)
-		},
-		func() {
-			projectile.Behave(r)
-		},
-	)
-
 	if err := enemyPool.DrawEnemies(r); err != nil {
 		return err
 	}
-
-	player := NewGamePlayer(
-		frect,
-		[]handlers.KeyboardEventHandler{projectileHandler},
-		[]handlers.AfterEventHandler{movementHandler, projectileHandler},
-	)
 	if err := player.Draw(r); err != nil {
 		return err
 	}
 	r.Present()
 
-	if err := bg.Draw(r); err != nil {
-		return err
-	}
-
 	loop := NewGameLoop(player, enemyPool, bg)
 	return loop.Run(r)
+}
+
+func setupPlayer(r *sdl.Renderer, ship *sdl.Texture, missile *sdl.Texture, pool EnemyPool) Player {
+	player := NewGamePlayer(
+		entities.NewFloatRectFactory().Create(ship, entities.Player, 375, 475, 55, 55),
+	)
+	player.InitializeProjectileManager(missile)
+	for _, row := range pool.Enemies() {
+		for _, e := range row {
+			player.AddTarget(e)
+		}
+	}
+	return player
 }
 
 func Load(r *sdl.Renderer, filename string) (*sdl.Texture, error) {

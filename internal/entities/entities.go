@@ -23,6 +23,7 @@ type Entity[T int32 | float32, V *sdl.Rect | *sdl.FRect] interface {
 	// MAKES COPY!
 	Rect() V
 
+	LoadTexture(texture *sdl.Texture)
 	Intersect(entity Entity[T, V]) bool
 	Destroy()
 	IsAlive() bool

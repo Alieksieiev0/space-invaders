@@ -30,11 +30,14 @@ func (g *GameLoop) Run(r *sdl.Renderer) error {
 		if err := r.Clear(); err != nil {
 			return err
 		}
+		if err := g.bg.Draw(r); err != nil {
+			return err
+		}
 		for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
 
 			switch e := event.(type) {
 			case *sdl.KeyboardEvent:
-				g.player.HandleKeyboardEvent(e)
+				g.player.RenderKeyboardEvent(e, r)
 			case *sdl.QuitEvent: // NOTE: Please use `*sdl.QuitEvent` for `v0.4.x` (current version).
 				println("Quit")
 				return nil
@@ -42,16 +45,15 @@ func (g *GameLoop) Run(r *sdl.Renderer) error {
 		}
 
 		g.enemyPool.HandleAfterEvent()
+		g.enemyPool.RenderAfterEvent(r)
 		g.enemyPool.DrawEnemies(r)
 
-		g.player.HandleAfterEvent()
 		if !g.player.IsAlive() {
 			return nil
 		}
+		g.player.HandleAfterEvent()
+		g.player.RenderAfterEvent(r)
 		if err := g.player.Draw(r); err != nil {
-			return err
-		}
-		if err := g.bg.Draw(r); err != nil {
 			return err
 		}
 		r.Present()
